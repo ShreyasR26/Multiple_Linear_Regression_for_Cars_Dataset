@@ -1,0 +1,168 @@
+import numpy as np
+#numpy is used for creating various arrays for calculations
+import pandas as pd
+#pandas is used for reading csv files
+import matplotlib.pyplot as plt
+#used for showing various plots
+import seaborn as sb
+sb.set()
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+#To check multicollineaality between the variables
+from sklearn.preprocessing import StandardScaler
+#used for scaling
+from sklearn.model_selection import train_test_split
+#Used to verify the model
+from sklearn.linear_model import LinearRegression
+raw_data=pd.read_csv('C:/Users/admin/Downloads/Car Prices.csv')
+#Reads the csv file(spreadsheet) from the pandas library.
+print(raw_data)
+#displays the raw data from the csv file
+
+print(raw_data.describe(include='all'))
+#displays the statistics for all data available
+
+
+data=raw_data.drop(['Model'],axis=1)
+#The column 'Model' is being dropped because there are too many different models(312)
+#axis=0 for rows, axis=1 for columns.
+print(data)
+#displays data after 'Model' is removed
+print(data.describe(include='all'))
+
+print(data.isnull())
+#prints the missing values
+print(data.isnull().sum())
+#gives a list of missing values, 172 in price and 150 in EngineV
+
+data_no_mv=data.dropna(axis=0)
+#removing all missing values in the data
+
+print(data_no_mv.isnull().sum())
+#gives final result of no missing values
+
+sb.distplot(data_no_mv['Price'])
+#due to excess outliers in the price, we are removing the top 1%
+
+q=data_no_mv['Price'].quantile(0.99)
+#Taking the 99th percentile of Price
+
+data_1=data_no_mv[data_no_mv['Price']<q]
+#displaying everything less than the 99th percentile of price
+print(data_1.describe(include='all'))
+
+sb.distplot(data_1['Mileage'])
+#mileage too has its outliers.
+
+q=data_1['Mileage'].quantile(0.99)
+#Taking the 99th percentile of Mileage
+
+data_2=data_no_mv[data_no_mv['Mileage']<q]
+#displaying everything less than the 99th percentile of price
+print(data_2.describe(include='all'))
+
+data_3=data_2[data_2['EngineV']<6.5]
+#gives approprite value to Engine Value
+
+q=data_3['Year'].quantile(0.01)
+data_4=data_3[data_3['Year']>q]
+sb.distplot(data_4['Year'])
+
+data_cleaned=data_4.reset_index(drop=True)
+#Final cleaned data, dropping unnessary content.
+
+"""Multi-collinearallity"""
+
+log_price=np.log(data_cleaned['Price'])
+#Converting the cleaned data to a log form.
+
+data_cleaned['Log_Price']=log_price
+#adding log price to table
+data_cleaned=data_cleaned.drop(['Price'],axis=1)
+#removing Price column
+print(data_cleaned.columns.values)
+#display the table contents
+
+variables=data_cleaned[['Mileage','Year','EngineV']]
+#columns with potential multicollineararity
+
+vif=pd.DataFrame()
+vif["VIF"]=[variance_inflation_factor(variables.values,i) for i in range(variables.shape[1])]
+#
+vif["Features"] = variables.columns
+print(vif)
+data_multicollinearity=data_cleaned.drop(['Year'],axis=1)
+#vif value should ideally be between 1 and 5, way too high for year,10.317
+
+"""Creating Dummy Variables"""
+data_with_dummies=pd.get_dummies(data_multicollinearity,drop_first='True')
+#adding dummy variables to everything except the first one
+print(data_with_dummies.head())
+
+targets=data_with_dummies['Log_Price']
+inputs=data_with_dummies.drop(['Log_Price'],axis=1)
+"""Scaling the Data"""
+
+scaler=StandardScaler()
+
+scaler.fit(inputs)
+
+inputs_scaled=scaler.transform(inputs)
+
+"""Trans_Train_Script"""
+x_train, x_test , y_train , y_test =train_test_split(inputs_scaled, targets,test_size=0.2,random_state=365)
+
+reg = LinearRegression()
+reg.fit(x_train,y_train)
+
+print(reg.score(x_train,y_train))
+#find R2 value
+
+y_hat=reg.predict(x_train)
+
+plt.scatter(y_train,y_hat)
+plt.xlabel('Targets',fontsize=20)
+plt.ylabel('Predictions',fontsize=20)
+plt.xlim(6,13)
+plt.ylim(6,13)
+plt.show()
+
+sb.distplot(y_train-y_hat)
+
+print(reg.intercept_)
+print(reg.coef_)
+
+reg_summary=pd.DataFrame(inputs.columns.values,columns=['Features'])
+
+reg_summary['weights']=reg.coef_
+print(reg_summary)
+
+"""Testing The model"""
+
+y_hat_test=reg.predict(x_test)
+
+plt.scatter(y_test,y_hat_test,alpha=0.2)
+plt.xlabel('y_test',fontsize=20)
+plt.ylabel('y_hat',fontsize=20)
+plt.xlim(6,13)
+plt.ylim(6,13)
+plt.show()
+
+df_pf=pd.DataFrame(np.exp(y_hat_test),columns=['Predictions'])
+print(df_pf.head())
+#dataframe performance
+
+y_test=y_test.reset_index(drop=True)
+print(y_test.head())
+
+
+df_pf['Target']=np.exp(y_test)
+print(df_pf)
+
+
+
+df_pf['Residual']=df_pf['Target']-df_pf['Predictions']
+
+df_pf['Difference']=np.absolute(df_pf['Residual']/df_pf['Target']*100)
+print(df_pf)
+
+print(df_pf.describe())
