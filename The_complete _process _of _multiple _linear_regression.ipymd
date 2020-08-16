@@ -1,4 +1,4 @@
-"""*************************************************************************************************************************************
+"""**************************************************************************************************************************************
 Projet Name: Multiple Linear Regression for a given data set about car sales.
 
 Description: A given data set,Car_Prices.csv has certain details for various cars. These include brand, price, Audi, Mileage,
